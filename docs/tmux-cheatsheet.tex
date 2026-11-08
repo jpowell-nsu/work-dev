@@ -1,0 +1,138 @@
+% ============================================================================
+%  tmux-cheatsheet.tex
+%  Quick reference for tmux key bindings and commands (default bindings).
+%  Requires linuxnotes.sty in the same folder.
+%  Compile twice with pdflatex so "Page X of Y" resolves.
+% ============================================================================
+\documentclass[11pt]{article}
+
+\usepackage[pagenumbers]{linuxnotes}
+
+\linuxnotesmeta{tmux Cheat Sheet}
+
+% Header row style shared by every table.
+\newcommand{\headrow}{\rowcolor{navy!8}}
+
+% \key from linuxnotes.sty cannot take a percent sign, so \keylit is the same
+% boxed style with its argument typeset as written (use \% for a percent).
+\newcommand{\keylit}[1]{%
+  \fcolorbox{rulecol}{keybg}{\rule[-0.2em]{0pt}{0.9em}\footnotesize\texttt{#1}}%
+}
+% \tk{d} shows the prefix followed by a key: Ctrl+b, then d.
+\newcommand{\tk}[1]{\key{Ctrl+b}\enspace\keylit{#1}}
+
+\begin{document}
+
+\linuxnotestitle{WORK-DEV}{tmux Cheat Sheet}{Sessions, windows, panes, and scrolling with the default key bindings}
+
+\section{The prefix key}
+
+Every shortcut starts with the prefix \key{Ctrl+b}. In the tables, \tk{d} means press
+\key{Ctrl+b}, release both keys, then press \key{d}. If nothing happens, you probably
+held \key{Ctrl} down too long.
+
+\section{Sessions}
+
+A session is a whole workspace. It keeps running after you detach until you kill it.
+
+\par\noindent\begin{minipage}{\linewidth}\centering
+\captionof{table}{Session keys and commands.}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.32\linewidth} >{\raggedright\arraybackslash}p{0.27\linewidth} >{\raggedright\arraybackslash}p{0.31\linewidth}}
+\toprule
+\headrow
+\bfseries Action & \bfseries Inside tmux & \bfseries From a terminal \\
+\midrule
+Detach and leave it running & \tk{d} & None \\
+List sessions & \tk{s} & \cmd{tmux ls} \\
+Attach to a session & None & \cmd{tmux attach -t} \var{NAME} \\
+Start a new session & None & \cmd{tmux new -s} \var{NAME} \\
+Rename the current session & \tk{\$} & None \\
+Close the current session & \tk{:} \cmd{kill-session} & \cmd{tmux kill-session -t} \var{NAME} \\
+Close every session & None & \cmd{tmux kill-server} \\
+\bottomrule
+\end{tabular}
+\end{minipage}\par\medskip
+
+\section{Windows}
+
+A window is like a browser tab; the status bar lists windows by number.
+
+\par\noindent\begin{minipage}{\linewidth}\centering
+\captionof{table}{Window keys.}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.55\linewidth} >{\raggedright\arraybackslash}p{0.35\linewidth}}
+\toprule
+\headrow
+\bfseries Action & \bfseries Keys \\
+\midrule
+New window & \tk{c} \\
+Next window & \tk{n} \\
+Previous window & \tk{p} \\
+Jump to a window by number & \tk{0} through \keylit{9} \\
+Pick from a list of all windows & \tk{w} \\
+Toggle to the last window used & \tk{l} \\
+Rename the current window & \tk{,} \\
+Close the current window (asks first) & \tk{\&} \\
+\bottomrule
+\end{tabular}
+\end{minipage}\par\medskip
+
+\section{Panes}
+
+Panes split one window into several terminals. \tk{z} zooms one pane to full size and back.
+
+\par\noindent\begin{minipage}{\linewidth}\centering
+\captionof{table}{Pane keys.}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.46\linewidth} >{\raggedright\arraybackslash}p{0.44\linewidth}}
+\toprule
+\headrow
+\bfseries Action & \bfseries Keys \\
+\midrule
+Split left and right & \tk{\%} \\
+Split top and bottom & \tk{"} \\
+Move to the pane in a direction & \key{Ctrl+b} then an arrow key \\
+Cycle through panes & \tk{o} \\
+Show pane numbers, then press one to jump & \tk{q} \\
+Zoom the current pane in or out & \tk{z} \\
+Resize the current pane & \key{Ctrl+b}, then \key{Ctrl} plus an arrow key \\
+Cycle through preset layouts & \tk{Space} \\
+Turn the current pane into its own window & \tk{!} \\
+Close the current pane (asks first) & \tk{x} \\
+\bottomrule
+\end{tabular}
+\end{minipage}\par\medskip
+
+\section{Scrolling, copying, and commands}
+
+By default the mouse wheel does not scroll, so use copy mode; press \key{q} to leave it.
+
+\par\noindent\begin{minipage}{\linewidth}\centering
+\captionof{table}{Copy mode and command keys.}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.46\linewidth} >{\raggedright\arraybackslash}p{0.44\linewidth}}
+\toprule
+\headrow
+\bfseries Action & \bfseries Keys \\
+\midrule
+Enter copy mode (scroll back) & \tk{[} \\
+Scroll in copy mode & Arrow keys, \key{PgUp}, \key{PgDn} \\
+Search backward in copy mode & \key{?} then the text, then \key{Enter} \\
+Start selecting text & \key{Space} \\
+Copy the selection and leave copy mode & \key{Enter} \\
+Paste the copied text & \tk{]} \\
+Open the tmux command prompt & \tk{:} \\
+Show every key binding & \tk{?} (press \key{q} to close) \\
+\bottomrule
+\end{tabular}
+\end{minipage}\par\medskip
+
+\notebox{Tip.}{For mouse scrolling and clicking between panes, add \cmd{set -g mouse on}
+to \file{~/.tmux.conf}, then run \cmd{tmux source-file ~/.tmux.conf}.}
+
+\vspace{1em}
+\noindent{\footnotesize\color{navysoft}\copyright\ 2026 Jason Powell. Part of Work-Dev. Licensed under
+\href{https://creativecommons.org/licenses/by/4.0/}{Creative Commons Attribution 4.0 (CC BY 4.0)}.}
+
+\end{document}

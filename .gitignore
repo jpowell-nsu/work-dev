@@ -1,0 +1,19 @@
+# LaTeX build files (keep the .tex sources and, if you like, the finished PDFs)
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+
+# Editor and system files
+*.swp
+*~
+.DS_Store
+
+# Per-project settings for the work script, if one is created here
+.workrc

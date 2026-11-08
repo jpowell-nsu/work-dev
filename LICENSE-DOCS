@@ -1,0 +1,25 @@
+Copyright (c) 2026 Jason Powell
+
+The written materials in this repository are licensed under the Creative
+Commons Attribution 4.0 International License (CC BY 4.0). This covers:
+
+  - docs/workdev-cheatsheet.tex and the PDF built from it
+  - docs/tmux-cheatsheet.tex and the PDF built from it
+  - docs/linux-notes-template.tex and the PDF built from it
+  - The text of README.md
+
+You are free to share and adapt these materials for any purpose, including
+in your own courses, as long as you give appropriate credit, provide a link
+to the license, and indicate if changes were made.
+
+Suggested credit line:
+  "Based on Work-Dev by Jason Powell, licensed under CC BY 4.0."
+
+Full license text:
+  https://creativecommons.org/licenses/by/4.0/legalcode
+
+Plain-language summary:
+  https://creativecommons.org/licenses/by/4.0/
+
+The code in this repository (bin/workdev and docs/linuxnotes.sty) is licensed
+separately under the MIT License. See the LICENSE file.

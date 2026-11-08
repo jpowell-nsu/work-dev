@@ -1,0 +1,121 @@
+% ============================================================================
+%  workdev-cheatsheet.tex
+%  Quick reference for the workdev tmux workspace command.
+%  Requires linuxnotes.sty in the same folder.
+%  Compile twice with pdflatex so "Page X of Y" resolves.
+% ============================================================================
+\documentclass[11pt]{article}
+
+\usepackage[pagenumbers]{linuxnotes}
+
+\linuxnotesmeta{workdev Cheat Sheet}
+
+% Header row style shared by every table: shaded and bold, so it is easy to
+% mark as header cells during the Acrobat tagging pass.
+\newcommand{\headrow}{\rowcolor{navy!8}}
+
+\begin{document}
+
+\linuxnotestitle{WORK-DEV}{workdev Cheat Sheet}{One command to open a ready-made project workspace}
+
+\noindent
+Run \cmd{workdev} \var{NAME} to open a project. Running it again reattaches to the same
+workspace, which keeps running in the background until you close it.
+
+\section{Commands}
+
+\par\noindent\begin{minipage}{\linewidth}\centering
+\captionof{table}{Every workdev command and option.}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.36\linewidth} >{\raggedright\arraybackslash}p{0.56\linewidth}}
+\toprule
+\headrow
+\bfseries Command & \bfseries What it does \\
+\midrule
+\cmd{workdev} & Pick a project from \cmd{$WORK_DIR} (uses fzf if installed) \\
+\cmd{workdev} \var{NAME} & Open the project folder \cmd{$WORK_DIR/}\var{NAME} \\
+\cmd{workdev} \var{PATH} & Open any folder by path, such as \cmd{workdev .} \\
+\cmd{workdev} \var{NAME} \var{BRANCH} & Switch to git branch \var{BRANCH}, then open the project \\
+\cmd{workdev -d} \var{NAME} [\var{BRANCH}] & Build the workspace without attaching \\
+\cmd{workdev -l} & List running workspaces \\
+\cmd{workdev -k} \var{NAME} & Close the workspace \var{NAME} completely \\
+\cmd{workdev -h} & Show the built-in help \\
+\bottomrule
+\end{tabular}
+\end{minipage}\par\medskip
+
+\section{Layout}
+
+The \cmd{dev} window (window 0) has three labeled panes. A \cmd{server} window
+(window 1) appears only when \file{.workrc} sets \cmd{SERVER_CMD}.
+
+\par\noindent\begin{minipage}{\linewidth}\centering
+\captionof{table}{Panes in the dev window.}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.18\linewidth} >{\raggedright\arraybackslash}p{0.18\linewidth} >{\raggedright\arraybackslash}p{0.54\linewidth}}
+\toprule
+\headrow
+\bfseries Pane & \bfseries Position & \bfseries What it shows \\
+\midrule
+editor [\var{branch}] & Left & Your editor; the label shows the current git branch \\
+shell & Top right & A plain terminal in the project folder \\
+status & Bottom right & Live \cmd{git status} every 5 seconds, or a file listing outside git \\
+\bottomrule
+\end{tabular}
+\end{minipage}\par\medskip
+
+\section{Settings}
+
+Add these lines to \file{~/.bashrc}, then run \cmd{source ~/.bashrc} to reload it.
+
+\begin{lstlisting}
+export PATH="$HOME/.local/bin:$PATH"
+export WORK_DIR="$HOME/Projects"
+\end{lstlisting}
+
+Optional per-project settings go in \file{.workrc} in the project folder, one
+\cmd{KEY=value} per line. The file is read, never executed.
+
+\par\noindent\begin{minipage}{\linewidth}\centering
+\captionof{table}{Settings recognized in a .workrc file.}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.16\linewidth} >{\raggedright\arraybackslash}p{0.38\linewidth} >{\raggedright\arraybackslash}p{0.36\linewidth}}
+\toprule
+\headrow
+\bfseries Key & \bfseries What it controls & \bfseries Example \\
+\midrule
+\cmd{EDITOR_CMD} & Editor pane (default: \cmd{$EDITOR .}) & \cmd{EDITOR_CMD=nvim .} \\
+\cmd{STATUS_CMD} & Status pane (default: git status) & \cmd{STATUS_CMD=git log --oneline -15} \\
+\cmd{SERVER_CMD} & Adds a \cmd{server} window running it & \cmd{SERVER_CMD=python3 -m http.server} \\
+\bottomrule
+\end{tabular}
+\end{minipage}\par\medskip
+
+\section{Common fixes}
+
+\par\noindent\begin{minipage}{\linewidth}\centering
+\captionof{table}{Problems and how to fix them.}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.27\linewidth} >{\raggedright\arraybackslash}p{0.27\linewidth} >{\raggedright\arraybackslash}p{0.36\linewidth}}
+\toprule
+\headrow
+\bfseries Problem & \bfseries Cause & \bfseries Fix \\
+\midrule
+\cmd{workdev: command not found} & \file{~/.local/bin} is not on PATH, or the file is not executable & Add the PATH line above, then run \cmd{chmod +x ~/.local/bin/workdev} \\
+``Cannot find a project'' & A tilde inside quotes is not expanded & Use \cmd{"$HOME/Projects"}, not \cmd{"~/Projects"} \\
+Only some panes appear & Panes were closed with \cmd{exit} & Run \cmd{workdev -k} \var{NAME}, then \cmd{workdev} \var{NAME} \\
+``Not switching because of uncommitted changes'' & Edits would carry over to the other branch & Run \cmd{git commit -am "message"} or \cmd{git stash}, then retry \\
+``There is no branch named \ldots'' & A typo, or a branch not yet created & Pick from the list shown, or run \cmd{git switch -c} \var{NAME} \\
+Editor shows old text after a switch & Files were loaded before the switch & In vim, type \cmd{:e!} and press \key{Enter} \\
+\bottomrule
+\end{tabular}
+\end{minipage}\par\medskip
+
+\warnbox{Remember.}{To step away without losing anything, detach with \key{Ctrl+b} then
+\key{d} instead of exiting the panes.}
+
+\vspace{1em}
+\noindent{\footnotesize\color{navysoft}\copyright\ 2026 Jason Powell. Part of Work-Dev. Licensed under
+\href{https://creativecommons.org/licenses/by/4.0/}{Creative Commons Attribution 4.0 (CC BY 4.0)}.}
+
+\end{document}

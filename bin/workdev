@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+#
+# workdev: open a ready-made tmux workspace for a project with one command.
+# Part of Work-Dev. Copyright (c) 2026 Jason Powell. MIT License.
+#
+# Running "workdev myproject" creates a tmux session named after the project
+# with an editor, a spare shell, and a live status pane already arranged.
+# Running it again later reattaches to the same session, so nothing is lost
+# if you close the terminal.
+#
+# Requires tmux 3.1 or newer. fzf is optional (used for the project picker).
+
+set -euo pipefail
+
+# Folder that holds your projects. Override it with: export WORK_DIR=~/code
+WORK_DIR="${WORK_DIR:-$HOME/projects}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  workdev                 Pick a project from $WORK_DIR (uses fzf if installed)
+  workdev NAME            Open the project NAME found under $WORK_DIR
+  workdev PATH            Open the project at PATH (any directory)
+  workdev NAME BRANCH     Switch the project to git branch BRANCH, then open it
+  workdev -d NAME|PATH [BRANCH]
+                          Build the workspace but do not attach to it
+  workdev -l              List running workspaces
+  workdev -k NAME         Close the workspace NAME
+  workdev -h              Show this help
+
+Layout of the "dev" window:
+  +------------------------+-----------+
+  |                        |  shell    |
+  |  editor                +-----------+
+  |                        |  status   |
+  +------------------------+-----------+
+
+Optional settings: put a file named .workrc in the project folder with
+one KEY=value per line, for example:
+  EDITOR_CMD=nvim .
+  STATUS_CMD=git log --oneline --graph -15
+  SERVER_CMD=python3 -m http.server 8000
+When SERVER_CMD is set, a second window named "server" runs it.
+EOF
+}
+
+die() {
+  printf 'workdev: %s\n' "$*" >&2
+  exit 1
+}
+
+# Read KEY=value from a .workrc file. The file is parsed, not executed,
+# so a project folder cannot run arbitrary code just by being opened.
+read_setting() {
+  local file="$1" key="$2"
+  [[ -f "$file" ]] || return 0
+  grep -E "^${key}=" "$file" | tail -n 1 | cut -d= -f2- || true
+}
+
+# Let the user choose a project folder when no argument is given.
+pick_project() {
+  [[ -d "$WORK_DIR" ]] || die "no project folder at $WORK_DIR (set WORK_DIR or pass a path)"
+  local projects
+  projects=$(find "$WORK_DIR" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n' | sort)
+  [[ -n "$projects" ]] || die "no projects found in $WORK_DIR"
+
+  if command -v fzf >/dev/null 2>&1; then
+    printf '%s\n' "$projects" | fzf --prompt='project> ' --height=40% --reverse \
+      || die "no project chosen"
+  else
+    printf 'Projects in %s:\n%s\n\nRun: workdev NAME\n' "$WORK_DIR" "$projects" >&2
+    exit 0
+  fi
+}
+
+# Turn a name or path into an absolute project folder.
+resolve_project() {
+  local target="$1"
+  if [[ -d "$target" ]]; then
+    realpath "$target"
+  elif [[ -d "$WORK_DIR/$target" ]]; then
+    realpath "$WORK_DIR/$target"
+  else
+    die "cannot find a project called '$target' (looked in . and $WORK_DIR)"
+  fi
+}
+
+# Switch the project folder to the requested git branch before opening it.
+# Refuses to switch when there are uncommitted changes to tracked files,
+# because git would carry those edits over to the other branch.
+switch_branch() {
+  local path="$1" branch="$2" current
+
+  git -C "$path" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+    || die "'$path' is not a git repository, so it has no branches"
+
+  current=$(git -C "$path" branch --show-current)
+  if [[ "$current" == "$branch" ]]; then
+    echo "Already on branch '$branch'."
+    return 0
+  fi
+
+  # The branch must exist locally or on the remote. This guards against typos
+  # quietly creating a brand new branch.
+  if ! git -C "$path" show-ref --verify --quiet "refs/heads/$branch" \
+     && ! git -C "$path" show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+    printf 'workdev: there is no branch named %s. Branches in this project:\n' "'$branch'" >&2
+    git -C "$path" branch -a --format='  %(refname:short)' >&2
+    printf 'To create it, run: git -C %q switch -c %q\n' "$path" "$branch" >&2
+    exit 1
+  fi
+
+  if [[ -n "$(git -C "$path" status --porcelain --untracked-files=no)" ]]; then
+    printf 'workdev: not switching from %s to %s because of uncommitted changes:\n' \
+      "'$current'" "'$branch'" >&2
+    git -C "$path" status --short --untracked-files=no >&2
+    echo "Commit them (git commit -am \"message\") or set them aside (git stash), then try again." >&2
+    exit 1
+  fi
+
+  git -C "$path" switch --quiet "$branch" || die "git could not switch to '$branch'"
+  echo "Switched to branch '$branch'."
+}
+
+# tmux does not allow dots or colons in session names.
+session_name() {
+  basename "$1" | tr '.:' '__'
+}
+
+list_workspaces() {
+  tmux list-sessions \
+    -F '#{session_name}  (#{session_windows} #{?#{==:#{session_windows},1},window,windows} - #{?session_attached,attached,detached})' \
+    2>/dev/null || echo "No workspaces are running."
+}
+
+# Create the session, split it into panes, and start a command in each.
+build_workspace() {
+  local name="$1" path="$2" rc="$2/.workrc"
+  local editor_cmd status_cmd server_cmd
+
+  editor_cmd=$(read_setting "$rc" EDITOR_CMD)
+  status_cmd=$(read_setting "$rc" STATUS_CMD)
+  server_cmd=$(read_setting "$rc" SERVER_CMD)
+
+  : "${editor_cmd:=${EDITOR:-vi} .}"
+
+  # Default status pane: live git status in a repository, a file listing otherwise.
+  if [[ -z "$status_cmd" ]]; then
+    if git -C "$path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      if command -v watch >/dev/null 2>&1; then
+        status_cmd="watch -t -c -n 5 git -c color.status=always status -sb"
+      else
+        status_cmd="git status -sb"
+      fi
+    else
+      status_cmd="ls -la"
+    fi
+  fi
+
+  # Capture pane ids so the script works no matter how base-index is set.
+  local editor_pane shell_pane status_pane
+  editor_pane=$(tmux new-session -d -P -F '#{pane_id}' -s "$name" -n dev -c "$path")
+  shell_pane=$(tmux split-window -h -l 35% -P -F '#{pane_id}' -t "$editor_pane" -c "$path")
+  status_pane=$(tmux split-window -v -l 40% -P -F '#{pane_id}' -t "$shell_pane" -c "$path")
+
+  # Label each pane in its border so the layout explains itself.
+  # In a git repo the editor label also shows the current branch, for example
+  # "editor [dev]". tmux reruns the git command every few seconds, so the
+  # label follows along when you switch branches.
+  tmux set-option -w -t "$editor_pane" pane-border-status top
+  tmux set-option -w -t "$editor_pane" pane-border-format ' #{@label}#{E:@branch} '
+  tmux set-option -p -t "$editor_pane" @label 'editor'
+  if git -C "$path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    local quoted_path
+    printf -v quoted_path '%q' "$path"
+    tmux set-option -p -t "$editor_pane" @branch \
+      " [#(git -C $quoted_path branch --show-current 2>/dev/null)]"
+  fi
+  tmux set-option -t "$name" status-interval 5
+  tmux set-option -p -t "$shell_pane"  @label 'shell'
+  tmux set-option -p -t "$status_pane" @label 'status'
+
+  # send-keys (rather than running the command directly) leaves a normal
+  # shell behind if the command exits, so the pane never disappears.
+  tmux send-keys -t "$editor_pane" "$editor_cmd" Enter
+  tmux send-keys -t "$status_pane" "$status_cmd" Enter
+
+  if [[ -n "$server_cmd" ]]; then
+    local server_pane
+    server_pane=$(tmux new-window -d -P -F '#{pane_id}' -t "$name:" -n server -c "$path")
+    tmux send-keys -t "$server_pane" "$server_cmd" Enter
+  fi
+
+  tmux select-window -t "$editor_pane"
+  tmux select-pane -t "$editor_pane"
+}
+
+attach_workspace() {
+  local name="$1"
+  if [[ -n "${TMUX:-}" ]]; then
+    tmux switch-client -t "=$name"   # already inside tmux: jump to it
+  else
+    tmux attach-session -t "=$name"
+  fi
+}
+
+main() {
+  command -v tmux >/dev/null 2>&1 || die "tmux is not installed"
+
+  local attach=1
+  case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+    -l) list_workspaces; exit 0 ;;
+    -k)
+      [[ -n "${2:-}" ]] || die "-k needs a workspace name"
+      tmux kill-session -t "=$2" && echo "Closed workspace '$2'."
+      exit 0
+      ;;
+    -d) attach=0; shift ;;
+    -*) die "unknown option '$1' (try workdev -h)" ;;
+  esac
+
+  local target="${1:-}" branch="${2:-}"
+  [[ -n "$target" ]] || target=$(pick_project)
+
+  local path name
+  path=$(resolve_project "$target")
+  name=$(session_name "$path")
+
+  local switched=0
+  if [[ -n "$branch" ]]; then
+    local before
+    before=$(git -C "$path" branch --show-current 2>/dev/null || true)
+    switch_branch "$path" "$branch"
+    [[ "$before" == "$branch" ]] || switched=1
+  fi
+
+  if tmux has-session -t "=$name" 2>/dev/null; then
+    echo "Reattaching to workspace '$name'."
+    if [[ "$switched" -eq 1 ]]; then
+      echo "Note: files already open in the editor still show the old branch."
+      echo "Reload them (in vim, type :e! and press Enter)."
+      sleep 2   # give time to read the note before tmux takes over the screen
+    fi
+  else
+    build_workspace "$name" "$path"
+    echo "Built workspace '$name' in $path."
+  fi
+
+  if [[ "$attach" -eq 1 ]]; then
+    attach_workspace "$name"
+  fi
+}
+
+main "$@"
