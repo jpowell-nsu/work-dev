@@ -174,7 +174,7 @@ build_workspace() {
     local quoted_path
     printf -v quoted_path '%q' "$path"
     tmux set-option -p -t "$editor_pane" @branch \
-      " [#(git -C $quoted_path branch --show-current 2>/dev/null)]"
+      " branch: [#(git -C $quoted_path branch --show-current 2>/dev/null)]"
   fi
   tmux set-option -t "$name" status-interval 5
   tmux set-option -p -t "$shell_pane"  @label 'shell'

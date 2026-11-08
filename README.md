@@ -12,10 +12,11 @@ printable cheat sheets and an accessible LaTeX style for the documentation.
 | Item | What it is |
 | --- | --- |
 | `bin/workdev` | Opens a tmux workspace for a project: editor, shell, and live git status |
+| `docs/workdev-cheatsheet.pdf` | Two-page pdf reference for every `workdev` command, setting, and common fix |
 | `docs/workdev-cheatsheet.tex` | Two-page reference for every `workdev` command, setting, and common fix |
+| `docs/tmux-cheatsheet.pdf` | Two-page pdf reference for tmux sessions, windows, panes, and copy mode |
 | `docs/tmux-cheatsheet.tex` | Two-page reference for tmux sessions, windows, panes, and copy mode |
 | `docs/linuxnotes.sty` | LaTeX style for Linux class handouts, built to meet WCAG 2.1 AA |
-| `docs/linux-notes-template.tex` | Starter document showing every feature of the style |
 
 ## The workdev command
 
