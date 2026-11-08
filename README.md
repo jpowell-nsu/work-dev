@@ -5,6 +5,8 @@ command. Its main tool is `workdev`, a Bash script that opens a tmux session wit
 editor, a shell, and a live git status already arranged. The repository also includes
 printable cheat sheets and an accessible LaTeX style for the documentation.
 
+![A tmux window with an editor on the left, a shell at top right, and git status at bottom right](docs/images/workspace.png)
+
 ## What is included
 
 | Item | What it is |
